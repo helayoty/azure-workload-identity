@@ -197,7 +197,7 @@
 </tbody></table>
 <h2 id="azure-ad-workload-identity-components"><a class="header" href="#azure-ad-workload-identity-components">Azure AD Workload Identity Components</a></h2>
 <table><thead><tr><th>Component</th><th>Description</th><th>Guide</th></tr></thead><tbody>
-<tr><td>Mutating Admission Webhook</td><td>Projects a signed service account token to a well-known path (<code>/var/run/secrets/tokens/azure-identity-token</code>) and inject authentication-related environment variables to your pods based on annotated service account.</td><td><a href="./installation/mutating-admission-webhook.html">Link</a></td></tr>
+<tr><td>Mutating Admission Webhook</td><td>Projects a signed service account token to a well-known path (<code>/var/run/secrets/azure/tokens/azure-identity-token</code>) and inject authentication-related environment variables to your pods based on annotated service account.</td><td><a href="./installation/mutating-admission-webhook.html">Link</a></td></tr>
 <tr><td>Azure AD Workload Identity CLI (<code>azwi</code>)</td><td>A utility CLI that helps manage Azure AD Workload Identity and automate error-prone operations.</td><td><a href="./installation/azwi.html">Link</a></td></tr>
 </tbody></table>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="managed-clusters"><a class="header" href="#managed-clusters">Managed Clusters</a></h1>
@@ -537,7 +537,7 @@ EOF
 <tr><td><code>azure-identity-token</code></td><td>The projected service account volume.</td></tr>
 </tbody></table>
 <table><thead><tr><th>Volume mount</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>/var/run/secrets/tokens/azure-identity-token</code></td><td>The path of the projected service account token file.</td></tr>
+<tr><td><code>/var/run/secrets/azure/tokens/azure-identity-token</code></td><td>The path of the projected service account token file.</td></tr>
 </tbody></table>
 </details>
 <p>The webhook allows pods to use a <a href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#service-account-token-volume-projection">service account token</a> projected to a well-known volume path to exchange for an Azure AD access token by leveraging the above properties with the Azure Identity SDKs or the <a href="https://docs.microsoft.com/en-us/azure/active-directory/develop/msal-overview">Microsoft Authentication Library</a> (MSAL).</p>
@@ -570,7 +570,7 @@ TEST SUITE: None
 <h3 id="install-envsubst"><a class="header" href="#install-envsubst">Install <code>envsubst</code></a></h3>
 <p>The deployment YAML contains the environment variables we defined above and we rely on the <code>envsubst</code> binary to substitute them for their respective values before deploying. See <a href="https://github.com/a8m/envsubst#installation">the <code>envsubst</code>‘s installation guide</a> on how to install it.</p>
 <p>Install the webhook using the deployment YAML via <code>kubectl apply -f</code> and <code>envsubst</code>:</p>
-<pre><code class="language-bash">curl -s https://github.com/Azure/azure-workload-identity/releases/download/v0.7.0/azure-wi-webhook.yaml | envsubst | kubectl apply -f -
+<pre><code class="language-bash">curl -sL https://github.com/Azure/azure-workload-identity/releases/download/v0.9.0/azure-wi-webhook.yaml | envsubst | kubectl apply -f -
 </code></pre>
 <details>
 <summary>Output</summary>
@@ -600,9 +600,8 @@ mutatingwebhookconfiguration.admissionregistration.k8s.io/azure-wi-webhook-mutat
 </ul>
 </li>
 </ul>
-<h3 id="go-install"><a class="header" href="#go-install"><code>go install</code></a></h3>
-<pre><code class="language-bash">go install github.com/Azure/azure-workload-identity/cmd/azwi@v0.7.0
-</code></pre>
+<h3 id="github-releases"><a class="header" href="#github-releases">GitHub Releases</a></h3>
+<p>You can download <code>azwi</code> from our <a href="https://github.com/Azure/azure-workload-identity/releases">latest GitHub releases</a>.</p>
 <h3 id="homebrew-macos-only"><a class="header" href="#homebrew-macos-only">Homebrew (MacOS only)</a></h3>
 <pre><code class="language-bash">brew install Azure/azure-workload-identity/azwi
 </code></pre>
@@ -779,7 +778,7 @@ metadata:
 spec:
   serviceAccountName: ${SERVICE_ACCOUNT_NAME}
   containers:
-    - image: ghcr.io/azure/azure-workload-identity/msal-go:latest
+    - image: ghcr.io/azure/azure-workload-identity/msal-go
       name: oidc
       env:
       - name: KEYVAULT_NAME
@@ -790,6 +789,9 @@ spec:
     kubernetes.io/os: linux
 EOF
 </code></pre>
+<blockquote>
+<p>Feel free to swap the msal-go example image above with a list of <a href="./topics/language-specific-examples/msal.html">language-specific examples</a> we provide.</p>
+</blockquote>
 <p>To check whether all properties are injected properly by the webhook:</p>
 <pre><code class="language-bash">kubectl describe pod quick-start
 </code></pre>
@@ -804,7 +806,7 @@ EOF
 </tbody></table>
 <br/>
 <table><thead><tr><th>Volume mount</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>/var/run/secrets/tokens/azure-identity-token</code></td><td>The path of the projected service account token file.</td></tr>
+<tr><td><code>/var/run/secrets/azure/tokens/azure-identity-token</code></td><td>The path of the projected service account token file.</td></tr>
 </tbody></table>
 <br/>
 <table><thead><tr><th>Volume</th><th>Description</th></tr></thead><tbody>
@@ -841,7 +843,7 @@ Containers:
       AZURE_FEDERATED_TOKEN_FILE: (Injected by the webhook)
     Mounts:
       /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-844ns (ro)
-      /var/run/secrets/tokens from azure-identity-token (ro) (Injected by the webhook)
+      /var/run/secrets/azure/tokens from azure-identity-token (ro) (Injected by the webhook)
 Conditions:
   Type              Status
   Initialized       True
@@ -999,7 +1001,20 @@ az rest --method POST --uri &quot;https://graph.microsoft.com/beta/applications/
 <pre><code class="language-bash">az rest --method DELETE --uri &quot;https://graph.microsoft.com/beta/applications/${APPLICATION_OBJECT_ID}/federatedIdentityCredentials/${FIC_ID}&quot;
 </code></pre>
 <h2 id="azure-portal-ui"><a class="header" href="#azure-portal-ui">Azure Portal UI</a></h2>
-<p>Coming soon.</p>
+<ol>
+<li>Sign in to the <a href="https://portal.azure.com">Azure portal</a>. </li>
+<li>Go to <strong>App registrations</strong> and open the app you want to configure.</li>
+<li>Go to <strong>Certificates and secrets</strong>. </li>
+<li>In the <strong>Federated credentials</strong> tab, select <strong>Add credential</strong>. The <strong>Add a credential</strong> blade opens.</li>
+<li>In the <strong>Federated credential scenario</strong> drop-down box select <strong>Kubernetes accessing Azure resources</strong>.</li>
+<li>Specify the <strong>Cluster issuer URL</strong>.</li>
+<li>Specify the <strong>Namespace</strong>.</li>
+<li>Specify the <strong>Service account name</strong>.</li>
+<li>The <strong>Subject identifier</strong> field autopopulate based on the values you entered.</li>
+<li>Add a <strong>Name</strong> for the federated credential.</li>
+<li>Click <strong>Add</strong> to configure the federated credential.</li>
+</ol>
+<p><img src="topics/../images/azure-portal-federated-credential-kubernetes.png" alt="Screenshot showing Azure Portal app registration federated credential screen for Kubernetes scenario" /></p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="azure-workload-identity-cli-azwi"><a class="header" href="#azure-workload-identity-cli-azwi">Azure Workload Identity CLI (<code>azwi</code>)</a></h1>
 <p>The Azure Workload Identity CLI (<code>azwi</code>) is a utility CLI that helps manage Azure AD Workload Identity and automate error-prone operations:</p>
 <ul>
@@ -1239,10 +1254,7 @@ done
 </code></pre>
 <h3 id="3-update-the-jwks"><a class="header" href="#3-update-the-jwks">3. Update the JWKS</a></h3>
 <p>In the case of service account tokens generated before you initiated the key rotation, you would need a time period where the old and new public keys exist in the JWKS. The relying party can then validate service account tokens signed by both the old and new private key.</p>
-<p>Install <code>azwi</code>:</p>
-<p><code>azwi</code> is a CLI tool that helps generate the JWKS document in JSON.</p>
-<pre><code class="language-bash">go install github.com/Azure/azure-workload-identity/cmd/azwi
-</code></pre>
+<p>Download <code>azwi</code> from our <a href="https://github.com/Azure/azure-workload-identity/releases">latest GitHub releases</a>, which is a CLI tool that helps generate the JWKS document in JSON.</p>
 <p>Generate and upload the JWKS:</p>
 <blockquote>
 <p>Assuming you followed our <a href="topics/self-managed-clusters/../../quick-start.html">Quick Start</a> and store your OIDC discovery document and JWKS in an Azure storage account.</p>
@@ -1298,7 +1310,7 @@ spec:
 EOF
 </code></pre>
 <p>Output the projected service account token:</p>
-<pre><code class="language-bash">kubectl exec dummy-pod -- cat /var/run/secrets/tokens/azure-identity-token
+<pre><code class="language-bash">kubectl exec dummy-pod -- cat /var/run/secrets/azure/tokens/azure-identity-token
 </code></pre>
 <p>Decode your token using <a href="https://jwt.io/">jwt.io</a>. The <code>kid</code> field in the token header should be the same as the <code>kid</code> of <code>azwi jwks --public-keys sa-new.pub | jq -r '.keys[0].kid'</code>. This means that the service account token is signed by the new private key.</p>
 <h3 id="6-cleanup"><a class="header" href="#6-cleanup">6. Cleanup</a></h3>
@@ -1426,11 +1438,11 @@ azure-workload-identity-control-plane   Ready    control-plane,master   2m28s   
 <p><em>Examples coming soon</em></p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="microsoft-authentication-library-msal"><a class="header" href="#microsoft-authentication-library-msal">Microsoft Authentication Library (MSAL)</a></h1>
 <table><thead><tr><th>Language</th><th>Library</th><th>Image</th><th>Example</th><th>Has Windows Images</th></tr></thead><tbody>
-<tr><td>Go</td><td><a href="https://github.com/AzureAD/microsoft-authentication-library-for-go">microsoft-authentication-library-for-go</a></td><td><code>ghcr.io/azure/azure-workload-identity/msal-go:latest</code></td><td><a href="https://github.com/Azure/azure-workload-identity/tree/main/examples/msal-go">Link</a></td><td>✅</td></tr>
-<tr><td>C#</td><td><a href="https://github.com/AzureAD/microsoft-authentication-library-for-dotnet">microsoft-authentication-library-for-dotnet</a></td><td><code>ghcr.io/azure/azure-workload-identity/msal-net:latest</code></td><td><a href="https://github.com/Azure/azure-workload-identity/tree/main/examples/msal-net/akvdotnet">Link</a></td><td>✅</td></tr>
-<tr><td>JavaScript/TypeScript</td><td><a href="https://github.com/AzureAD/microsoft-authentication-library-for-js">microsoft-authentication-library-for-js</a></td><td><code>ghcr.io/azure/azure-workload-identity/msal-node:latest</code></td><td><a href="https://github.com/Azure/azure-workload-identity/tree/main/examples/msal-node">Link</a></td><td>❌</td></tr>
-<tr><td>Python</td><td><a href="https://github.com/AzureAD/microsoft-authentication-library-for-python">microsoft-authentication-library-for-python</a></td><td><code>ghcr.io/azure/azure-workload-identity/msal-python:latest</code></td><td><a href="https://github.com/Azure/azure-workload-identity/tree/main/examples/msal-python">Link</a></td><td>❌</td></tr>
-<tr><td>Java</td><td><a href="https://github.com/AzureAD/microsoft-authentication-library-for-java">microsoft-authentication-library-for-java</a></td><td>N/A</td><td>N/A (<a href="https://github.com/AzureAD/microsoft-authentication-library-for-java/issues/437">known issue</a>)</td><td>❌</td></tr>
+<tr><td>C#</td><td><a href="https://github.com/AzureAD/microsoft-authentication-library-for-dotnet">microsoft-authentication-library-for-dotnet</a></td><td><code>ghcr.io/azure/azure-workload-identity/msal-net</code></td><td><a href="https://github.com/Azure/azure-workload-identity/tree/main/examples/msal-net/akvdotnet">Link</a></td><td>✅</td></tr>
+<tr><td>Go</td><td><a href="https://github.com/AzureAD/microsoft-authentication-library-for-go">microsoft-authentication-library-for-go</a></td><td><code>ghcr.io/azure/azure-workload-identity/msal-go</code></td><td><a href="https://github.com/Azure/azure-workload-identity/tree/main/examples/msal-go">Link</a></td><td>✅</td></tr>
+<tr><td>Java</td><td><a href="https://github.com/AzureAD/microsoft-authentication-library-for-java">microsoft-authentication-library-for-java</a></td><td><code>ghcr.io/azure/azure-workload-identity/msal-java</code></td><td><a href="https://github.com/Azure/azure-workload-identity/tree/main/examples/msal-java">Link</a></td><td>❌</td></tr>
+<tr><td>JavaScript/TypeScript</td><td><a href="https://github.com/AzureAD/microsoft-authentication-library-for-js">microsoft-authentication-library-for-js</a></td><td><code>ghcr.io/azure/azure-workload-identity/msal-node</code></td><td><a href="https://github.com/Azure/azure-workload-identity/tree/main/examples/msal-node">Link</a></td><td>❌</td></tr>
+<tr><td>Python</td><td><a href="https://github.com/AzureAD/microsoft-authentication-library-for-python">microsoft-authentication-library-for-python</a></td><td><code>ghcr.io/azure/azure-workload-identity/msal-python</code></td><td><a href="https://github.com/Azure/azure-workload-identity/tree/main/examples/msal-python">Link</a></td><td>❌</td></tr>
 </tbody></table>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="frequently-asked-questions"><a class="header" href="#frequently-asked-questions">Frequently Asked Questions</a></h1>
 <h2 id="why-is-managed-identity-not-supported-by-azure-workload-identity"><a class="header" href="#why-is-managed-identity-not-supported-by-azure-workload-identity">Why is managed identity not supported by Azure Workload Identity?</a></h2>
@@ -1438,6 +1450,8 @@ azure-workload-identity-control-plane   Ready    control-plane,master   2m28s   
 <h2 id="how-does-the-azwi-cli-differ-from-the-azure-cli"><a class="header" href="#how-does-the-azwi-cli-differ-from-the-azure-cli">How does the azwi-cli differ from the azure-cli?</a></h2>
 <p>The azwi-cli tool is specific to the Azure Workload Identity support in Kubernetes to group several manual steps (e.g. the creation of federated identity credential, annotated service accounts, etc) and automate them. Comparing with the azure-cli, it does not have an official command to add/delete federated identity (configuring federated identity credential with <code>az rest</code> is available <a href="https://docs.microsoft.com/en-us/azure/active-directory/develop/workload-identity-federation-create-trust">here</a>)</p>
 <p>Azure CLI and AKS are currently working on the above requirements, as well as an Azure CLI extension that natively integrate this project with AKS clusters.</p>
+<h2 id="how-is-azure-workload-identity-different-from-aad-pod-identity-v2"><a class="header" href="#how-is-azure-workload-identity-different-from-aad-pod-identity-v2">How is azure-workload-identity different from aad-pod-identity v2?</a></h2>
+<p>Azure Workload Identity is v2 of the AAD Pod Identity. AAD Pod Identity v2 was a placeholder name and is now rebranded as Azure Workload Identity.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h1>
 <ul>
 <li><a href="troubleshooting.html#logging">Logging</a>
@@ -1450,6 +1464,7 @@ azure-workload-identity-control-plane   Ready    control-plane,master   2m28s   
 </ul>
 </li>
 <li><a href="troubleshooting.html#ensure-the-service-account-is-labeled-with-azureworkloadidentityusetrue">Ensure the service account is labeled with <code>azure.workload.identity/use=true</code></a></li>
+<li><a href="troubleshooting.html#aadsts70021-no-matching-federated-identity-record-found-for-presented-assertion">AADSTS70021: No matching federated identity record found for presented assertion.</a></li>
 </ul>
 <p>An overview of a list of components to assist in troubleshooting.</p>
 <h2 id="logging"><a class="header" href="#logging">Logging</a></h2>
@@ -1476,10 +1491,16 @@ azure-workload-identity-control-plane   Ready    control-plane,master   2m28s   
 true
 </code></pre>
 </details>
+<h2 id="aadsts70021-no-matching-federated-identity-record-found-for-presented-assertion"><a class="header" href="#aadsts70021-no-matching-federated-identity-record-found-for-presented-assertion">AADSTS70021: No matching federated identity record found for presented assertion.</a></h2>
+<pre><code>token_credential.go:70] &quot;failed to acquire token&quot; err=&quot;FromAssertion(): http call(https://login.microsoftonline.com//{tenant-id}//oauth2/v2.0/token)(POST) error: reply status code was 400:\n{\&quot;error\&quot;:\&quot;invalid_request\&quot;,\&quot;error_description\&quot;:\&quot;AADSTS70021: No matching federated identity record found for presented assertion. Assertion Issuer: 'https://oidc.prod-aks.azure.com/XXXXXX/'. Assertion Subject: 'system:serviceaccount:default:workload-identity-sa'. Assertion Audience: 'api://AzureADTokenExchange'.\\r\\nTrace ID: b0f62116-10b6-4a73-bdb2-281524404e00\\r\\nCorrelation ID: 4a42e576-85bc-46ae-b7e3-b52cb8958917\\r\\nTimestamp: 2022-01-20 22:54:42Z\&quot;,\&quot;error_codes\&quot;:[70021],\&quot;timestamp\&quot;:\&quot;2022-01-20 22:54:42Z\&quot;,\&quot;trace_id\&quot;:\&quot;b0f62116-10b6-4a73-bdb2-281524404e00\&quot;,\&quot;correlation_id\&quot;:\&quot;4a42e576-85bc-46ae-b7e3-b52cb8958917\&quot;,\&quot;error_uri\&quot;:\&quot;https://login.microsoftonline.com/error?code=70021\&quot;}&quot;
+E0120 22:55:12.472912       1 token_credential.go:70] &quot;failed to acquire token&quot; err=&quot;FromAssertion(): http call(https://login.microsoftonline.com/{tenant-id}/oauth2/v2.0/token)(POST) error: reply status code was 400:\n{\&quot;error\&quot;:\&quot;invalid_request\&quot;,\&quot;error_description\&quot;:\&quot;AADSTS70021: No matching federated identity record found for presented assertion. Assertion Issuer: 'https://oidc.prod-aks.azure.com/XXXXXX/'. Assertion Subject: 'system:serviceaccount:default:workload-identity-sa'. Assertion Audience: 'api://AzureADTokenExchange'.\\r\\nTrace ID: 8f29172d-bf0d-4165-9d86-816665612d00\\r\\nCorrelation ID: 472f3de0-666f-411e-8d4c-cd46b6d6db26\\r\\nTimestamp: 2022-01-20 22:55:12Z\&quot;,\&quot;error_codes\&quot;:[70021],\&quot;timestamp\&quot;:\&quot;2022-01-20 22:55:12Z\&quot;,\&quot;trace_id\&quot;:\&quot;8f29172d-bf0d-4165-9d86-816665612d00\&quot;,\&quot;correlation_id\&quot;:\&quot;472f3de0-666f-411e-8d4c-cd46b6d6db26\&quot;,\&quot;error_uri\&quot;:\&quot;https://login.microsoftonline.com/error?code=70021\&quot;}&quot;
+</code></pre>
+<p>If you encounter the error above, it means that the issuer of the service account token does not match the issuer you defined in the federated identity credential. In the case of an AKS cluster with OIDC issuer enabled, the most common cause is when the user is missing the trailing <code>/</code> when creating the federated identity credential (e.g. <code>https://oidc.prod-aks.azure.com/XXXXXX</code> vs <code>https://oidc.prod-aks.azure.com/XXXXXX/</code>).</p>
+<p>You can follow <a href="./installation/managed-clusters.html#steps-to-get-the-oidc-issuer-url-from-a-generic-managed-cluster">this guide</a> on how to get the token issuer of your cluster.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="known-issues"><a class="header" href="#known-issues">Known Issues</a></h1>
 <h2 id="permission-denied-when-reading-the-projected-service-account-token-file"><a class="header" href="#permission-denied-when-reading-the-projected-service-account-token-file">Permission denied when reading the projected service account token file</a></h2>
 <p>In Kubernetes 1.18, the default mode for the projected service account token file is <code>0600</code>. This causes containers running as non-root to fail while trying to read the token file:</p>
-<pre><code class="language-bash">F0826 20:03:20.113998 1 main.go:27] failed to get secret from keyvault, err: autorest/Client#Do: Preparing request failed: StatusCode=0 -- Original Error: failed to read service account token: open /var/run/secrets/tokens/azure-identity-token: permission denied
+<pre><code class="language-bash">F0826 20:03:20.113998 1 main.go:27] failed to get secret from keyvault, err: autorest/Client#Do: Preparing request failed: StatusCode=0 -- Original Error: failed to read service account token: open /var/run/secrets/azure/tokens/azure-identity-token: permission denied
 </code></pre>
 <p>The default mode was changed to <code>0644</code> in Kubernetes v1.19, which allows containers running as non-root to read the projected service account token.</p>
 <p>If you ran into this issue, you can either:</p>
@@ -1546,7 +1567,7 @@ az rest --method post --uri &quot;${URI}&quot; --body &quot;${BODY}&quot; --head
 <li>Prerequisites from <a href="./installation.html#prerequisites">Installation</a></li>
 <li>Install <a href="https://golang.org/dl/">go</a>
 <ul>
-<li>Get the latest patch version for go 1.17.</li>
+<li>Get the latest patch version for go 1.18.</li>
 </ul>
 </li>
 <li>Install <a href="https://stedolan.github.io/jq/">jq</a>
@@ -1609,10 +1630,7 @@ az storage blob upload \
   --file openid-configuration.json \
   --name .well-known/openid-configuration
 </code></pre>
-<p>Install <code>azwi</code>:</p>
-<p><code>azwi</code> is a CLI tool that helps generate the JWKS document in JSON.</p>
-<pre><code class="language-bash">go install github.com/Azure/azure-workload-identity/cmd/azwi
-</code></pre>
+<p>Download <code>azwi</code> from our <a href="https://github.com/Azure/azure-workload-identity/releases">latest GitHub releases</a>, which is a CLI tool that helps generate the JWKS document in JSON.</p>
 <p>Generate and upload the JWKS:</p>
 <pre><code class="language-bash">azwi jwks --public-keys sa.pub --output-file jwks.json
 az storage blob upload \
